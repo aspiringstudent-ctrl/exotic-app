@@ -11,9 +11,9 @@ GridStream Ops is split into four layers:
 
 When no MQTT broker is configured, the simulator produces a new reading for each device every interval. The dashboard aggregates those readings into fleet KPIs, evaluates alert rules, ranks device risk, and renders the latest fleet state.
 
-When `VITE_MQTT_URL` and `VITE_MQTT_TOPIC` are configured, the browser connects to the broker over WebSockets and subscribes to the configured topic. MQTT payloads are normalized into partial telemetry updates, merged with the previous device reading, appended to local history, and passed through the same alert-resolution path as simulated readings.
+When `VITE_MQTT_URL` and `VITE_MQTT_TOPIC` are configured, the browser connects to the broker over WebSockets and subscribes to the configured topic. MQTT payloads are normalized into partial telemetry updates, merged with the previous device reading, appended to local history, and passed through the same alert-resolution path as simulated readings. If the broker is connected but does not deliver valid known-device readings, the source is marked stale and the simulator keeps the dashboard moving.
 
-In production, a trusted ingestion service should validate MQTT payloads, write immutable readings into `telemetry_readings`, and publish sanitized realtime events to the browser. Direct browser MQTT is useful for pilots and controlled demos, but broker credentials are public once shipped to the client.
+For persistence, `npm run mqtt:ingest` starts a trusted Node process that subscribes to MQTT, validates complete readings, maps payload `device_id` values to `devices.external_id`, and inserts immutable rows into `telemetry_readings` with the Supabase service-role key. Direct browser MQTT is useful for pilots and controlled demos, but broker credentials are public once shipped to the client.
 
 ## Authentication
 

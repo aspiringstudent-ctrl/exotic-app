@@ -9,8 +9,9 @@ GridStream Ops is a React, TypeScript, and Vite dashboard for electrical operati
 The current application is production-shaped but still demo-oriented in a few areas:
 
 - Supabase authentication is integrated and can be enforced with environment variables.
-- The Supabase database schema and Row Level Security policies are present as a migration.
-- Device catalog data, alert actions, and ticket actions are currently client-side.
+- The Supabase database schema and Row Level Security policies are present as migrations.
+- A server-side MQTT ingestor can persist complete streaming readings into Supabase.
+- Device catalog data, alert actions, and ticket actions are currently client-side in the browser dashboard.
 - Telemetry can come from either the deterministic simulator or MQTT-over-WebSocket.
 - If MQTT is configured but silent, the dashboard marks MQTT as stale and keeps the UI moving with simulator fallback.
 
@@ -28,7 +29,9 @@ The current application is production-shaped but still demo-oriented in a few ar
 - Risk Priority panel that ranks assets by alert state and live telemetry stress.
 - MQTT telemetry ingestion from browser-safe WebSocket brokers.
 - Random MQTT publisher script for generating moving test data.
-- Typed domain logic and unit tests for telemetry, alerts, risk, and MQTT parsing.
+- Backend MQTT-to-Supabase ingestor for durable telemetry storage.
+- Supabase demo seed script for organization, site, device, and alert rule setup.
+- Typed domain logic and unit tests for telemetry, alerts, risk, MQTT parsing, and ingestion row mapping.
 
 ## 3. Technology Stack
 
@@ -43,6 +46,7 @@ The current application is production-shaped but still demo-oriented in a few ar
 | Tests | Node test runner through `tsx --test` |
 | Linting | ESLint 9 with TypeScript ESLint |
 | Packaging | Vite build output, Dockerfile, nginx config |
+| Server scripts | Node.js MQTT publisher, Supabase seed, and MQTT ingestor |
 
 ## 4. Repository Layout
 
@@ -52,7 +56,10 @@ The current application is production-shaped but still demo-oriented in a few ar
 |   |-- architecture.md
 |   `-- project-documentation.md
 |-- scripts/
-|   `-- publish-random-telemetry.mjs
+|   |-- ingest-mqtt-to-supabase.mjs
+|   |-- publish-random-telemetry.mjs
+|   |-- seed-supabase-demo.mjs
+|   `-- lib/
 |-- src/
 |   |-- App.tsx
 |   |-- components/
@@ -83,14 +90,17 @@ Important source areas:
 - `src/services/mqttTelemetry.ts`: MQTT configuration normalization and payload parser.
 - `src/services/mqttClient.ts`: mqtt.js browser client, connect, subscribe, message handling, disconnect.
 - `scripts/publish-random-telemetry.mjs`: local publisher that sends randomized readings to the configured MQTT broker.
-- `supabase/migrations/0001_initial_schema.sql`: production schema foundation with RLS policies.
+- `scripts/ingest-mqtt-to-supabase.mjs`: trusted backend subscriber that persists complete MQTT readings to Supabase.
+- `scripts/seed-supabase-demo.mjs`: idempotent demo catalog seed for Supabase.
+- `scripts/lib`: shared Node helpers for runtime configuration and MQTT payload ingestion.
+- `supabase/migrations`: production schema foundation, RLS policies, and MQTT ingestion mapping support.
 
 ## 5. Local Development
 
 Install dependencies:
 
 ```bash
-npm install
+npm ci
 ```
 
 Start Vite:
@@ -109,17 +119,27 @@ If Supabase variables are missing, the app shows a local demo access screen. Cli
 
 ## 6. Environment Variables
 
-Create `.env.local` from `.env.example`.
+Create `.env.local` from `.env.example`. Leave Supabase values blank for demo mode and MQTT values blank for simulator mode.
 
 ```bash
-VITE_SUPABASE_URL="https://your-project.supabase.co"
-VITE_SUPABASE_ANON_KEY="your-anon-key"
+VITE_SUPABASE_URL=""
+VITE_SUPABASE_ANON_KEY=""
+SUPABASE_URL=""
+SUPABASE_SERVICE_ROLE_KEY=""
+GRIDSTREAM_OWNER_EMAIL=""
 
 VITE_MQTT_URL="wss://broker.example.com:8084/mqtt"
 VITE_MQTT_TOPIC="gridstream/telemetry/#"
 VITE_MQTT_USERNAME="optional-browser-scoped-user"
 VITE_MQTT_PASSWORD="optional-browser-scoped-password"
 VITE_MQTT_CLIENT_ID="optional-client-id"
+
+MQTT_URL=""
+MQTT_TOPIC=""
+MQTT_USERNAME=""
+MQTT_PASSWORD=""
+MQTT_CLIENT_ID=""
+MQTT_PUBLISH_INTERVAL_MS="1500"
 ```
 
 Variable behavior:
@@ -132,10 +152,18 @@ Variable behavior:
 | `VITE_MQTT_TOPIC` | No | Browser and publisher | MQTT subscription topic, commonly `gridstream/telemetry/#`. |
 | `VITE_MQTT_USERNAME` | No | Browser and publisher | Optional MQTT username. |
 | `VITE_MQTT_PASSWORD` | No | Browser and publisher | Optional MQTT password. |
-| `VITE_MQTT_CLIENT_ID` | No | Browser and publisher | Optional base MQTT client id. |
+| `VITE_MQTT_CLIENT_ID` | No | Browser and scripts | Optional base MQTT client id. |
+| `SUPABASE_URL` | No | Server scripts | Server-side Supabase URL. Falls back to `VITE_SUPABASE_URL`. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes for server scripts | Server scripts | Service-role key used only by seed and ingestion scripts. Never expose in browser builds. |
+| `GRIDSTREAM_OWNER_EMAIL` | No | Seed script | Optional signed-up Supabase Auth email to assign as owner of the demo organization. |
+| `MQTT_URL` | No | Server scripts | Server-side MQTT URL override. Falls back to `VITE_MQTT_URL`. |
+| `MQTT_TOPIC` | No | Server scripts | Server-side MQTT topic override. Falls back to `VITE_MQTT_TOPIC`. |
+| `MQTT_USERNAME` | No | Server scripts | Server-side MQTT username override. |
+| `MQTT_PASSWORD` | No | Server scripts | Server-side MQTT password override. |
+| `MQTT_CLIENT_ID` | No | Server scripts | Server-side MQTT client id base. A random suffix is added. |
 | `MQTT_PUBLISH_INTERVAL_MS` | No | Publisher only | Overrides the random publisher interval. Default is `1500`. |
 
-Security note: every `VITE_` variable is bundled for browser use. Do not place privileged MQTT credentials or Supabase service-role keys in Vite environment variables.
+Security note: every `VITE_` variable is bundled for browser use. Do not place privileged MQTT credentials or Supabase service-role keys in Vite environment variables. `SUPABASE_SERVICE_ROLE_KEY` belongs only in trusted server environments.
 
 ## 7. Runtime Modes
 
@@ -351,6 +379,8 @@ If `VITE_MQTT_URL` is set to a bare host, the app normalizes it to:
 wss://<host>:8084/mqtt
 ```
 
+If a user pastes an `mqtt://`, `mqtts://`, or `tcp://` broker URL, the app converts it to a browser WebSocket URL by removing the broker protocol and using `wss://`. Existing `ws://` and `wss://` URLs are preserved as entered.
+
 The subscription topic is controlled by `VITE_MQTT_TOPIC`.
 
 ### Accepted MQTT Payload Shapes
@@ -461,8 +491,8 @@ npm run mqtt:publish
 
 The publisher:
 
-- Reads `.env.local`.
-- Uses `VITE_MQTT_URL`, `VITE_MQTT_TOPIC`, `VITE_MQTT_USERNAME`, `VITE_MQTT_PASSWORD`, and `VITE_MQTT_CLIENT_ID`.
+- Reads `.env` and `.env.local`, with shell environment variables taking priority.
+- Uses `MQTT_URL`, `MQTT_TOPIC`, `MQTT_USERNAME`, `MQTT_PASSWORD`, and `MQTT_CLIENT_ID`, falling back to the matching `VITE_MQTT_*` values.
 - Publishes one JSON message per seeded device.
 - Publishes to the base topic plus the device id.
 - Uses random but bounded values around each device baseline.
@@ -475,7 +505,7 @@ Override interval:
 MQTT_PUBLISH_INTERVAL_MS=750 npm run mqtt:publish
 ```
 
-If `VITE_MQTT_TOPIC` is:
+If `MQTT_TOPIC` or `VITE_MQTT_TOPIC` is:
 
 ```text
 gridstream/telemetry/#
@@ -492,7 +522,52 @@ gridstream/telemetry/dev-tx-04
 gridstream/telemetry/dev-fdr-18
 ```
 
-## 14. Supabase Integration
+## 14. MQTT To Supabase Persistence
+
+The browser MQTT client is for live display. Durable storage is handled by a trusted Node process so the Supabase service-role key is never shipped to the browser.
+
+Required setup:
+
+1. Run every migration in `supabase/migrations/` in order.
+2. Set `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` or the server environment.
+3. Optionally set `GRIDSTREAM_OWNER_EMAIL` to an email that has already signed up in Supabase Auth.
+4. Seed the demo catalog or create your own devices with `external_id` values matching MQTT `device_id` or `asset_id` values.
+
+The seed script also assigns `GRIDSTREAM_OWNER_EMAIL` as an owner membership when that profile exists.
+
+Seed the demo catalog:
+
+```bash
+npm run supabase:seed
+```
+
+Start ingestion:
+
+```bash
+npm run mqtt:ingest
+```
+
+Publish demo readings from another terminal:
+
+```bash
+npm run mqtt:publish
+```
+
+The ingestor loads `devices.id`, `devices.organization_id`, and `devices.external_id` from Supabase. For every MQTT payload, it validates and inserts complete rows into `telemetry_readings`. Payloads for unknown devices are skipped and trigger a catalog refresh. Partial payloads are skipped for persistence because `telemetry_readings` requires every electrical metric.
+
+Required database fields per persisted reading:
+
+- `voltage_v`
+- `current_a`
+- `active_power_kw`
+- `reactive_power_kvar`
+- `power_factor`
+- `frequency_hz`
+- `temperature_c`
+- `total_harmonic_distortion`
+- `load_percent`
+
+## 15. Supabase Integration
 
 ### Client Behavior
 
@@ -522,13 +597,13 @@ The client is configured with:
 
 ### Database Schema
 
-The migration creates:
+The migrations create:
 
 - `profiles`
 - `organizations`
 - `org_memberships`
 - `sites`
-- `devices`
+- `devices` with `external_id` mapping for MQTT payload IDs
 - `telemetry_readings`
 - `alert_rules`
 - `alerts`
@@ -559,7 +634,7 @@ RLS is enabled for all application tables. Policies enforce:
 
 The schema is ready for production persistence, but the current React dashboard still loads seeded catalog data from `src/data/seed.ts`. A future phase should replace seeded data with Supabase queries and mutations protected by these RLS policies.
 
-## 15. Local Persistence
+## 16. Local Persistence
 
 The stream hook persists operator actions to browser local storage under:
 
@@ -574,7 +649,7 @@ Persisted fields:
 
 The reset action clears this local storage key and restores the seeded alert and ticket state.
 
-## 16. Scripts
+## 17. Scripts
 
 | Command | Purpose |
 | --- | --- |
@@ -585,8 +660,17 @@ The reset action clears this local storage key and restores the seeded alert and
 | `npm run typecheck` | Run TypeScript build checks. |
 | `npm run test` | Run telemetry and MQTT parser unit tests. |
 | `npm run mqtt:publish` | Publish randomized MQTT telemetry from `.env.local`. |
+| `npm run mqtt:ingest` | Subscribe to MQTT and insert complete telemetry rows into Supabase. |
+| `npm run supabase:seed` | Seed the demo organization, sites, devices, and alert rules into Supabase. |
+| `npm run check` | Run lint, typecheck, tests, and production build. |
 
 Recommended validation before pushing:
+
+```bash
+npm run check
+```
+
+Or run each gate separately:
 
 ```bash
 npm run lint
@@ -595,7 +679,7 @@ npm run test
 npm run build
 ```
 
-## 17. Testing Strategy
+## 18. Testing Strategy
 
 Current unit tests cover:
 
@@ -607,6 +691,7 @@ Current unit tests cover:
 - snake_case MQTT payload parsing
 - batched MQTT payload parsing
 - invalid MQTT payload rejection
+- database ingestion row mapping and skip behavior
 
 Recommended next tests:
 
@@ -616,7 +701,7 @@ Recommended next tests:
 - Ticket workflow transitions.
 - Playwright end-to-end test for dashboard rendering and MQTT-driven updates.
 
-## 18. Production Deployment
+## 19. Production Deployment
 
 Static hosting path:
 
@@ -633,21 +718,23 @@ Docker path:
 Supabase path:
 
 1. Create a Supabase project.
-2. Run `supabase/migrations/0001_initial_schema.sql`.
+2. Run every SQL file in `supabase/migrations/` in order.
 3. Enable desired email auth providers.
 4. Add users through Supabase Auth.
-5. Create organizations and memberships.
-6. Replace seeded dashboard reads with Supabase-backed data access.
+5. Create organizations and memberships, or set `GRIDSTREAM_OWNER_EMAIL` before running the seed script.
+6. Run `npm run supabase:seed` for the demo catalog, or load your own devices with `external_id` values.
+7. Replace seeded dashboard reads with Supabase-backed data access.
 
 MQTT path:
 
 1. Use a broker that supports MQTT over WebSockets.
 2. Create browser-scoped credentials.
-3. Restrict the client to only the required topics.
-4. Prefer read-only browser subscriptions for production.
-5. Use a trusted backend for ingestion, validation, persistence, and privileged broker credentials.
+3. Restrict browser clients to only the required read topics.
+4. Run `npm run mqtt:ingest` on a trusted server for persistence.
+5. Prefer read-only browser subscriptions for production.
+6. Use a trusted backend for validation, persistence, and privileged broker credentials.
 
-## 19. Security Notes
+## 20. Security Notes
 
 - Never put Supabase service-role keys in `VITE_` variables.
 - Never put privileged broker credentials in `VITE_` variables.
@@ -658,7 +745,7 @@ MQTT path:
 - Keep service-role Supabase access only in backend processes.
 - Keep raw telemetry immutable and store derived operational state separately.
 
-## 20. Troubleshooting
+## 21. Troubleshooting
 
 ### Supabase Login Screen Does Not Appear
 
@@ -704,6 +791,7 @@ Check:
 
 - Use a WebSocket URL, normally `wss://host:8084/mqtt`.
 - If using a bare host, the app assumes port `8084` and path `/mqtt`.
+- If pasting an `mqtt://`, `mqtts://`, or `tcp://` broker URL, confirm the resulting WebSocket host, port, and path match the broker's WebSocket listener.
 - Username and password are correct.
 - Broker supports browser WebSocket connections.
 - Topic ACL allows the configured topic.
@@ -717,6 +805,17 @@ The chart needs history for the selected device. Current code preserves readings
 - Whether incoming MQTT data uses known device IDs.
 - Whether the selected device is filtered out.
 - Whether history is being appended and capped at 48 points.
+
+### MQTT Ingestor Does Not Insert Rows
+
+Check:
+
+- `SUPABASE_SERVICE_ROLE_KEY` is set only in the server environment.
+- All migrations, including `0002_mqtt_ingestion_support.sql`, have run.
+- `npm run supabase:seed` has created devices with matching `external_id` values.
+- If checking data through user-scoped RLS, the user has an `org_memberships` row.
+- MQTT payloads contain all required electrical metrics.
+- The ingestor terminal logs `inserted ... telemetry rows`.
 
 ### Random Publisher Connects But Dashboard Is Still Stale
 
@@ -739,13 +838,13 @@ npm run lint
 
 Vite environment variables are statically replaced. Restart the dev server or rebuild after changing them.
 
-## 21. Known Gaps And Next Engineering Phase
+## 22. Known Gaps And Next Engineering Phase
 
 High-value next tasks:
 
 1. Load organizations, sites, devices, alert rules, alerts, tickets, and recent readings from Supabase.
 2. Add Supabase mutations for alert acknowledgement and ticket workflow.
-3. Create a backend MQTT ingestion service that validates payloads and writes `telemetry_readings`.
+3. Promote `npm run mqtt:ingest` into a managed backend service with health checks, logs, and deploy configuration.
 4. Issue short-lived MQTT credentials after Supabase auth.
 5. Add database seed scripts for demo organizations and memberships.
 6. Add Playwright tests for auth, live dashboard updates, alerts, tickets, and CSV export.
@@ -753,7 +852,7 @@ High-value next tasks:
 8. Add audit log writes for alert and ticket actions.
 9. Add retention or partitioning strategy for high-volume telemetry.
 
-## 22. Development Conventions
+## 23. Development Conventions
 
 - Keep domain behavior in `src/domain` and cover it with unit tests.
 - Keep network adapters in `src/services`.
@@ -763,15 +862,12 @@ High-value next tasks:
 - Keep browser credentials scoped and replace privileged actions with backend services.
 - Prefer typed transformations over ad hoc parsing when changing telemetry contracts.
 
-## 23. Quick Verification Checklist
+## 24. Quick Verification Checklist
 
 Use this checklist after changes:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test
-npm run build
+npm run check
 ```
 
 Manual checks:

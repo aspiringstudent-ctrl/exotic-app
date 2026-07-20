@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseMqttTelemetryPayload } from "./mqttTelemetry";
+import {
+  normalizeMqttWebSocketUrl,
+  parseMqttTelemetryPayload,
+} from "./mqttTelemetry";
 
 test("parses snake_case MQTT telemetry records", () => {
   const updates = parseMqttTelemetryPayload(
@@ -45,4 +48,19 @@ test("ignores MQTT records without device id or metrics", () => {
   );
 
   assert.equal(updates.length, 0);
+});
+
+test("normalizes MQTT broker URLs for browser WebSocket connections", () => {
+  assert.equal(
+    normalizeMqttWebSocketUrl("y4e1641e.ala.asia-southeast1.emqxsl.com"),
+    "wss://y4e1641e.ala.asia-southeast1.emqxsl.com:8084/mqtt",
+  );
+  assert.equal(
+    normalizeMqttWebSocketUrl("mqtt://broker.example.com:8084/mqtt"),
+    "wss://broker.example.com:8084/mqtt",
+  );
+  assert.equal(
+    normalizeMqttWebSocketUrl("wss://broker.example.com:8084/mqtt"),
+    "wss://broker.example.com:8084/mqtt",
+  );
 });

@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 /* global clearInterval, console, setInterval */
-import fs from "node:fs";
 import process from "node:process";
 import mqtt from "mqtt";
+import {
+  getMqttServerConfig,
+  loadRuntimeEnv,
+  redactUrl,
+} from "./lib/runtime-config.mjs";
 
 const devices = [
   {
@@ -44,32 +48,24 @@ const devices = [
   },
 ];
 
-const env = loadEnvFile(".env.local");
-const mqttUrl = normalizeMqttUrl(env.VITE_MQTT_URL);
-const baseTopic = (env.VITE_MQTT_TOPIC || "gridstream/telemetry/#")
-  .replace(/\/#$/, "")
-  .replace(/\/\+$/, "")
-  .replace(/\/$/, "");
-const intervalMs = Number(process.env.MQTT_PUBLISH_INTERVAL_MS || 1500);
-
-if (!mqttUrl) {
-  fail("VITE_MQTT_URL is missing in .env.local");
-}
-
-const client = mqtt.connect(mqttUrl, {
+const env = loadRuntimeEnv();
+const mqttConfig = createMqttConfig(env);
+const baseTopic = normalizePublishBaseTopic(mqttConfig.topic);
+const intervalMs = normalizeIntervalMs(env.MQTT_PUBLISH_INTERVAL_MS);
+const client = mqtt.connect(mqttConfig.url, {
   clean: true,
-  clientId: `${env.VITE_MQTT_CLIENT_ID || "gridstream-publisher"}-${randomId()}`,
+  clientId: mqttConfig.clientId,
   connectTimeout: 10_000,
-  password: optional(env.VITE_MQTT_PASSWORD),
+  password: mqttConfig.password,
   reconnectPeriod: 3_000,
-  username: optional(env.VITE_MQTT_USERNAME),
+  username: mqttConfig.username,
 });
 
 let tick = 0;
 let timer;
 
 client.on("connect", () => {
-  console.log(`connected ${redactUrl(mqttUrl)}`);
+  console.log(`connected ${redactUrl(mqttConfig.url)}`);
   console.log(`publishing ${devices.length} devices every ${intervalMs}ms`);
 
   publishBatch();
@@ -97,10 +93,13 @@ process.on("SIGTERM", shutdown);
 function publishBatch() {
   tick += 1;
   const capturedAt = new Date().toISOString();
+  let sample;
 
   for (const device of devices) {
     const reading = createReading(device, tick, capturedAt);
-    const topic = `${baseTopic}/${device.id}`;
+    const topic = topicForDevice(baseTopic, device.id);
+
+    sample ??= reading;
 
     client.publish(topic, JSON.stringify(reading), { qos: 0 }, (error) => {
       if (error) {
@@ -109,10 +108,11 @@ function publishBatch() {
     });
   }
 
-  const sample = createReading(devices[0], tick, capturedAt);
-  console.log(
-    `published tick=${tick} sample=${sample.device_id} load=${sample.load_percent}% temp=${sample.temperature_c}C pf=${sample.power_factor}`,
-  );
+  if (sample) {
+    console.log(
+      `published tick=${tick} sample=${sample.device_id} load=${sample.load_percent}% temp=${sample.temperature_c}C pf=${sample.power_factor}`,
+    );
+  }
 }
 
 function createReading(device, tickValue, capturedAt) {
@@ -175,46 +175,29 @@ function createReading(device, tickValue, capturedAt) {
   };
 }
 
-function loadEnvFile(path) {
-  if (!fs.existsSync(path)) {
-    return {};
+function createMqttConfig(runtimeEnv) {
+  try {
+    return getMqttServerConfig(runtimeEnv, "gridstream-publisher");
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
   }
-
-  return Object.fromEntries(
-    fs
-      .readFileSync(path, "utf8")
-      .split(/\n/)
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith("#"))
-      .map((line) => {
-        const index = line.indexOf("=");
-        const key = line.slice(0, index).trim();
-        let value = line.slice(index + 1).trim();
-
-        if (
-          (value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))
-        ) {
-          value = value.slice(1, -1);
-        }
-
-        return [key, value];
-      }),
-  );
 }
 
-function normalizeMqttUrl(value) {
-  const url = value?.trim();
+function normalizeIntervalMs(value) {
+  const interval = Number(value || 1500);
 
-  if (!url) {
-    return "";
-  }
+  return Number.isFinite(interval) && interval > 0 ? interval : 1500;
+}
 
-  if (/^wss?:\/\//i.test(url)) {
-    return url;
-  }
+function normalizePublishBaseTopic(value) {
+  return (value || "gridstream/telemetry/#")
+    .trim()
+    .replace(/\/[#+]$/, "")
+    .replace(/\/$/, "");
+}
 
-  return `wss://${url.replace(/^\/+|\/+$/g, "")}:8084/mqtt`;
+function topicForDevice(baseTopicValue, deviceId) {
+  return baseTopicValue ? `${baseTopicValue}/${deviceId}` : deviceId;
 }
 
 function wave(tickValue, seed, amplitude, speed) {
@@ -235,18 +218,6 @@ function round(value, places) {
   const factor = 10 ** places;
 
   return Math.round(value * factor) / factor;
-}
-
-function optional(value) {
-  return value?.trim() || undefined;
-}
-
-function randomId() {
-  return Math.random().toString(16).slice(2, 8);
-}
-
-function redactUrl(value) {
-  return value.replace(/:\/\/([^@]+)@/, "://<redacted>@");
 }
 
 function shutdown() {

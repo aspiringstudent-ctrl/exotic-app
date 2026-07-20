@@ -55,7 +55,6 @@ export function getMqttTelemetryConfig(): MqttTelemetryConfig | null {
   };
 }
 
-
 export function parseMqttTelemetryPayload(payload: string): MqttTelemetryUpdate[] {
   const parsed = JSON.parse(payload) as unknown;
   const records = getPayloadRecords(parsed);
@@ -167,14 +166,26 @@ function normalizeOptionalEnv(value: string | undefined): string | undefined {
   return normalized ? normalized : undefined;
 }
 
-function normalizeMqttWebSocketUrl(value: string): string {
-  if (/^wss?:\/\//i.test(value)) {
-    return value;
+export function normalizeMqttWebSocketUrl(value: string): string {
+  const trimmedValue = value.trim();
+
+  if (/^wss?:\/\//i.test(trimmedValue)) {
+    return trimmedValue;
   }
 
-  const trimmedValue = value.replace(/^\/+|\/+$/g, "");
+  const brokerPath = trimmedValue
+    .replace(/^(mqtts?|tcp):\/\//i, "")
+    .replace(/^\/+|\/+$/g, "");
 
-  return `wss://${trimmedValue}:8084/mqtt`;
+  if (!brokerPath) {
+    return "";
+  }
+
+  if (brokerPath.includes("/")) {
+    return `wss://${brokerPath}`;
+  }
+
+  return `wss://${brokerPath}${/:[0-9]+$/.test(brokerPath) ? "" : ":8084"}/mqtt`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
