@@ -4,8 +4,10 @@ import type {
   AlertRule,
   ComparisonOperator,
   Device,
+  DeviceRisk,
   FleetSummary,
   NumericTelemetryMetric,
+  RiskLevel,
   TelemetryReading,
 } from "./types";
 
@@ -212,6 +214,120 @@ export function calculateFleetSummary(
     averagePowerFactor,
     peakTemperatureC,
   };
+}
+
+export function calculateDeviceRisk(
+  device: Device,
+  reading: TelemetryReading | undefined,
+  alerts: Alert[],
+): DeviceRisk {
+  const activeAlerts = alerts.filter(
+    (alert) => alert.deviceId === device.id && alert.status !== "resolved",
+  );
+  const criticalAlerts = activeAlerts.filter(
+    (alert) => alert.severity === "critical",
+  ).length;
+  const warningAlerts = activeAlerts.filter(
+    (alert) => alert.severity === "warning",
+  ).length;
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (device.status === "offline") {
+    score += 44;
+    reasons.push("Offline asset");
+  } else if (device.status === "attention") {
+    score += 24;
+    reasons.push("Attention status");
+  }
+
+  if (criticalAlerts > 0) {
+    score += 38 + Math.min(12, (criticalAlerts - 1) * 4);
+    reasons.push(`${criticalAlerts} critical ${pluralize("alert", criticalAlerts)}`);
+  }
+
+  if (warningAlerts > 0) {
+    score += 16 + Math.min(10, (warningAlerts - 1) * 3);
+    reasons.push(`${warningAlerts} warning ${pluralize("alert", warningAlerts)}`);
+  }
+
+  if (!reading) {
+    score += 30;
+    reasons.push("No live reading");
+
+    const finalScore = normalizeRiskScore(score);
+
+    return {
+      deviceId: device.id,
+      score: finalScore,
+      level: riskLevelFromScore(finalScore),
+      reasons: reasons.slice(0, 4),
+    };
+  }
+
+  score += Math.max(0, reading.loadPercent - 72) * 0.62;
+  score += Math.max(0, reading.temperatureC - 54) * 0.88;
+  score += Math.max(0, 0.9 - reading.powerFactor) * 120;
+  score += Math.max(0, reading.totalHarmonicDistortion - 3.8) * 4.8;
+
+  if (reading.loadPercent >= 92) {
+    reasons.push(`Load ${formatMetricValue(reading.loadPercent, "loadPercent")}`);
+  } else if (reading.loadPercent >= 84) {
+    reasons.push("Elevated load");
+  }
+
+  if (reading.temperatureC >= 68) {
+    reasons.push(`Temperature ${formatMetricValue(reading.temperatureC, "temperatureC")}`);
+  } else if (reading.temperatureC >= 60) {
+    reasons.push("Temperature rising");
+  }
+
+  if (reading.powerFactor < 0.86) {
+    reasons.push(`Power factor ${formatMetricValue(reading.powerFactor, "powerFactor")}`);
+  }
+
+  if (reading.totalHarmonicDistortion >= 5.2) {
+    reasons.push(`THD ${formatMetricValue(reading.totalHarmonicDistortion, "totalHarmonicDistortion")}`);
+  }
+
+  const finalScore = normalizeRiskScore(score);
+
+  return {
+    deviceId: device.id,
+    score: finalScore,
+    level: riskLevelFromScore(finalScore),
+    reasons: reasons.length > 0 ? Array.from(new Set(reasons)).slice(0, 4) : ["Nominal telemetry"],
+  };
+}
+
+export function rankDevicesByRisk(
+  devices: Device[],
+  readings: Record<string, TelemetryReading>,
+  alerts: Alert[],
+): DeviceRisk[] {
+  return devices
+    .map((device) => calculateDeviceRisk(device, readings[device.id], alerts))
+    .sort((left, right) => right.score - left.score || left.deviceId.localeCompare(right.deviceId));
+}
+
+function riskLevelFromScore(score: number): RiskLevel {
+  if (score >= 70) {
+    return "urgent";
+  }
+
+  if (score >= 35) {
+    return "watch";
+  }
+
+  return "normal";
+}
+
+function normalizeRiskScore(score: number): number {
+  return Math.round(clamp(score, 0, 100));
+}
+
+function pluralize(value: string, count: number): string {
+  return count === 1 ? value : `${value}s`;
 }
 
 function readingFromLoad(

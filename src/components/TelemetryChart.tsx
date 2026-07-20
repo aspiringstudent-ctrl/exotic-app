@@ -11,8 +11,8 @@ export function TelemetryChart({ readings, metric }: TelemetryChartProps) {
   const width = 720;
   const height = 220;
   const padding = 18;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const min = values.length > 0 ? Math.min(...values) : 0;
+  const max = values.length > 0 ? Math.max(...values) : 0;
   const range = max - min || 1;
   const points = values.map((value, index) => {
     const x =
@@ -23,9 +23,16 @@ export function TelemetryChart({ readings, metric }: TelemetryChartProps) {
 
     return { x, y, value };
   });
-  const pointString = points.map((point) => `${point.x},${point.y}`).join(" ");
+  const displayPoints =
+    points.length === 1
+      ? [
+          { ...points[0], x: padding },
+          { ...points[0], x: width - padding },
+        ]
+      : points;
+  const pointString = displayPoints.map((point) => `${point.x},${point.y}`).join(" ");
   const areaString =
-    points.length > 0
+    displayPoints.length > 0
       ? `${padding},${height - padding} ${pointString} ${width - padding},${
           height - padding
         }`

@@ -5,6 +5,15 @@ export type AlertStatus = "open" | "acknowledged" | "resolved";
 export type TicketStatus = "open" | "scheduled" | "in_progress" | "resolved";
 export type MemberRole = "owner" | "operator" | "viewer";
 export type ComparisonOperator = ">" | ">=" | "<" | "<=";
+export type RiskLevel = "normal" | "watch" | "urgent";
+export type TelemetrySourceMode = "simulator" | "mqtt";
+export type TelemetrySourceState =
+  | "simulated"
+  | "connecting"
+  | "connected"
+  | "stale"
+  | "disconnected"
+  | "error";
 
 export type NumericTelemetryMetric =
   | "voltageV"
@@ -118,6 +127,13 @@ export interface MaintenanceTicket {
   updatedAt: string;
 }
 
+export interface DeviceRisk {
+  deviceId: string;
+  score: number;
+  level: RiskLevel;
+  reasons: string[];
+}
+
 export interface FleetSummary {
   totalDevices: number;
   onlineDevices: number;
@@ -128,6 +144,14 @@ export interface FleetSummary {
   averageLoadPercent: number;
   averagePowerFactor: number;
   peakTemperatureC: number;
+}
+
+export interface TelemetrySourceStatus {
+  mode: TelemetrySourceMode;
+  state: TelemetrySourceState;
+  topic?: string;
+  lastMessageAt?: string;
+  error?: string;
 }
 
 export interface TelemetryStreamState {

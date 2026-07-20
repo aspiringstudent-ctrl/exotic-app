@@ -8,6 +8,7 @@ interface AlertCenterProps {
   tickets: MaintenanceTicket[];
   onAcknowledge: (alertId: string) => void;
   onCreateTicket: (alert: Alert) => void;
+  limit?: number;
 }
 
 export function AlertCenter({
@@ -16,12 +17,13 @@ export function AlertCenter({
   tickets,
   onAcknowledge,
   onCreateTicket,
+  limit = 10,
 }: AlertCenterProps) {
   const deviceById = new Map(devices.map((device) => [device.id, device]));
   const ticketAlertIds = new Set(
     tickets.map((ticket) => ticket.alertId).filter(Boolean),
   );
-  const visibleAlerts = alerts.slice(0, 10);
+  const visibleAlerts = alerts.slice(0, limit);
 
   return (
     <section className="event-panel">
@@ -32,47 +34,51 @@ export function AlertCenter({
         </div>
         <TriangleAlert aria-hidden="true" size={20} />
       </div>
-      <div className="event-list">
-        {visibleAlerts.map((alert) => {
-          const device = deviceById.get(alert.deviceId);
-          const hasTicket = ticketAlertIds.has(alert.id);
+      {visibleAlerts.length === 0 ? (
+        <div className="empty-state">No alert history</div>
+      ) : (
+        <div className="event-list">
+          {visibleAlerts.map((alert) => {
+            const device = deviceById.get(alert.deviceId);
+            const hasTicket = ticketAlertIds.has(alert.id);
 
-          return (
-            <article className="event-item" key={alert.id}>
-              <div className="event-row">
-                <Badge tone={alert.severity} />
-                <Badge tone={alert.status} />
-              </div>
-              <h3>{alert.title}</h3>
-              <p>{alert.message}</p>
-              <div className="event-footer">
-                <span>{device?.name ?? "Unknown asset"}</span>
-                <span>{timeAgo(alert.triggeredAt)}</span>
-              </div>
-              <div className="action-row">
-                <button
-                  className="secondary-button"
-                  disabled={alert.status !== "open"}
-                  onClick={() => onAcknowledge(alert.id)}
-                  type="button"
-                >
-                  <CheckCheck aria-hidden="true" size={16} />
-                  Acknowledge
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={hasTicket}
-                  onClick={() => onCreateTicket(alert)}
-                  type="button"
-                >
-                  <Wrench aria-hidden="true" size={16} />
-                  Ticket
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
+            return (
+              <article className="event-item" key={alert.id}>
+                <div className="event-row">
+                  <Badge tone={alert.severity} />
+                  <Badge tone={alert.status} />
+                </div>
+                <h3>{alert.title}</h3>
+                <p>{alert.message}</p>
+                <div className="event-footer">
+                  <span>{device?.name ?? "Unknown asset"}</span>
+                  <span>{timeAgo(alert.triggeredAt)}</span>
+                </div>
+                <div className="action-row">
+                  <button
+                    className="secondary-button"
+                    disabled={alert.status !== "open"}
+                    onClick={() => onAcknowledge(alert.id)}
+                    type="button"
+                  >
+                    <CheckCheck aria-hidden="true" size={16} />
+                    Acknowledge
+                  </button>
+                  <button
+                    className="secondary-button"
+                    disabled={hasTicket}
+                    onClick={() => onCreateTicket(alert)}
+                    type="button"
+                  >
+                    <Wrench aria-hidden="true" size={16} />
+                    Ticket
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }

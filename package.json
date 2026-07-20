@@ -9,11 +9,14 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "lint": "eslint .",
-    "test": "tsx --test src/domain/telemetry.test.ts",
+    "mqtt:publish": "node scripts/publish-random-telemetry.mjs",
+    "test": "tsx --test src/domain/telemetry.test.ts src/services/mqttTelemetry.test.ts",
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.75.0",
     "lucide-react": "0.468.0",
+    "mqtt": "^5.15.2",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },
@@ -26,6 +29,7 @@
     "eslint-plugin-react-hooks": "5.0.0",
     "eslint-plugin-react-refresh": "0.4.14",
     "globals": "15.12.0",
+    "supabase": "^2.109.1",
     "tsx": "^4.23.1",
     "typescript": "5.6.3",
     "typescript-eslint": "8.15.0",

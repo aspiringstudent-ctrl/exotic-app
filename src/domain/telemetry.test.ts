@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  calculateDeviceRisk,
   calculateFleetSummary,
   compareMetric,
   createInitialReading,
   evaluateAlerts,
   nextReading,
+  rankDevicesByRisk,
 } from "./telemetry";
 import type { AlertRule, Device } from "./types";
 
@@ -96,4 +98,79 @@ test("summarizes fleet health from live readings and alerts", () => {
   assert.equal(summary.totalDevices, 1);
   assert.equal(summary.activeCriticalAlerts, 1);
   assert.ok(summary.activeLoadKw > 0);
+});
+
+
+test("scores urgent device risk from alerts and stressed telemetry", () => {
+  const reading = {
+    ...createInitialReading(device),
+    loadPercent: 96,
+    temperatureC: 72,
+    powerFactor: 0.82,
+    totalHarmonicDistortion: 6.1,
+  };
+  const risk = calculateDeviceRisk(device, reading, [
+    {
+      id: "alert-risk",
+      organizationId: "org-test",
+      deviceId: device.id,
+      ruleId: "rule-load",
+      severity: "critical",
+      status: "open",
+      title: "Load high",
+      message: "Load high",
+      metric: "loadPercent",
+      value: 96,
+      threshold: 92,
+      triggeredAt: reading.capturedAt,
+    },
+  ]);
+
+  assert.equal(risk.deviceId, device.id);
+  assert.equal(risk.level, "urgent");
+  assert.ok(risk.score >= 70);
+  assert.ok(risk.reasons.some((reason) => reason.includes("critical")));
+});
+
+test("ranks attention assets above nominal assets", () => {
+  const nominalDevice: Device = {
+    ...device,
+    id: "dev-nominal",
+    serialNumber: "TEST-002",
+    status: "online",
+    baselineLoadPercent: 35,
+  };
+  const attentionDevice: Device = {
+    ...device,
+    id: "dev-attention",
+    serialNumber: "TEST-003",
+    status: "attention",
+    baselineLoadPercent: 88,
+  };
+  const nominalReading = {
+    ...createInitialReading(nominalDevice),
+    loadPercent: 35,
+    temperatureC: 42,
+    powerFactor: 0.95,
+    totalHarmonicDistortion: 2.2,
+  };
+  const attentionReading = {
+    ...createInitialReading(attentionDevice),
+    loadPercent: 93,
+    temperatureC: 69,
+    powerFactor: 0.84,
+    totalHarmonicDistortion: 5.5,
+  };
+
+  const ranking = rankDevicesByRisk(
+    [nominalDevice, attentionDevice],
+    {
+      [nominalDevice.id]: nominalReading,
+      [attentionDevice.id]: attentionReading,
+    },
+    [],
+  );
+
+  assert.equal(ranking[0].deviceId, attentionDevice.id);
+  assert.ok(ranking[0].score > ranking[1].score);
 });
