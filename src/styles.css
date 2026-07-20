@@ -1,0 +1,699 @@
+:root {
+  color: #16211d;
+  background: #f4f6f2;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --ink: #16211d;
+  --muted: #65716d;
+  --line: #dce3dc;
+  --panel: #ffffff;
+  --panel-strong: #eef4ed;
+  --green: #1d7f5b;
+  --blue: #246b9c;
+  --amber: #b66f1d;
+  --red: #be3b34;
+  --nav: #10231c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button {
+  border: 0;
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 264px minmax(0, 1fr);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 24px 18px;
+  color: #edf8f1;
+  background: var(--nav);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+}
+
+.brand-mark,
+.stat-card-icon,
+.device-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+}
+
+.brand-mark {
+  color: #f2fbf5;
+  background: #1d7f5b;
+}
+
+.brand strong,
+.brand span {
+  display: block;
+}
+
+.brand strong {
+  font-size: 1rem;
+}
+
+.brand span {
+  color: #a7b9b0;
+  font-size: 0.83rem;
+}
+
+.nav-list {
+  display: grid;
+  gap: 8px;
+}
+
+.nav-item,
+.secondary-button,
+.primary-button,
+.segmented-control button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.nav-item {
+  justify-content: flex-start;
+  padding: 0 12px;
+  color: #b8c9c0;
+  background: transparent;
+}
+
+.nav-item:hover,
+.nav-item-active {
+  color: #ffffff;
+  background: #1c382d;
+}
+
+.sidebar-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding: 12px;
+  border: 1px solid #25463a;
+  border-radius: 8px;
+  background: #142d24;
+}
+
+.sidebar-status strong,
+.sidebar-status span {
+  display: block;
+}
+
+.sidebar-status span {
+  color: #a7b9b0;
+  font-size: 0.8rem;
+}
+
+.workspace {
+  display: grid;
+  align-content: start;
+  gap: 22px;
+  padding: 28px;
+}
+
+.topbar,
+.section-heading,
+.device-detail-header,
+.chart-header,
+.event-row,
+.event-footer,
+.action-row,
+.tag-row,
+.topbar-meta {
+  display: flex;
+  align-items: center;
+}
+
+.topbar {
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.topbar h1,
+.section-heading h2,
+.device-detail h2,
+.chart-header h2,
+.event-item h3,
+.ticket-card h3 {
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.topbar h1 {
+  font-size: clamp(1.8rem, 2.4vw, 2.7rem);
+}
+
+.topbar-meta {
+  justify-content: flex-end;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stat-card,
+.asset-list,
+.device-detail,
+.event-panel,
+.ticket-board {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 16px 40px rgba(30, 45, 38, 0.06);
+}
+
+.stat-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 124px;
+  padding: 18px;
+}
+
+.stat-card-icon {
+  color: var(--blue);
+  background: #e9f3f8;
+}
+
+.stat-card strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.stat-card span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.stat-card-good .stat-card-icon {
+  color: var(--green);
+  background: #e9f5ef;
+}
+
+.stat-card-warning .stat-card-icon {
+  color: var(--amber);
+  background: #fff4e4;
+}
+
+.stat-card-danger .stat-card-icon {
+  color: var(--red);
+  background: #fff0ef;
+}
+
+.overview-layout {
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
+}
+
+.asset-list,
+.event-panel,
+.ticket-board,
+.device-detail {
+  padding: 18px;
+}
+
+.section-heading {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.section-heading h2,
+.device-detail h2,
+.chart-header h2 {
+  font-size: 1.1rem;
+}
+
+.device-rows,
+.event-list,
+.ticket-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.device-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 72px;
+  padding: 10px;
+  color: var(--ink);
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #f8faf7;
+  cursor: pointer;
+}
+
+.device-row:hover,
+.device-row-active {
+  border-color: #9fcdb8;
+  background: #edf7f2;
+}
+
+.device-row-icon {
+  color: var(--green);
+  background: #e4f2ea;
+}
+
+.device-row-main,
+.device-row-meta {
+  display: grid;
+  gap: 5px;
+}
+
+.device-row-main strong {
+  overflow: hidden;
+  font-size: 0.92rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-row-main span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.device-row-meta {
+  justify-items: end;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.device-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.device-detail-header {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.device-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.segmented-control {
+  display: inline-grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  max-width: 420px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f3f6f2;
+}
+
+.segmented-control button {
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--muted);
+  background: transparent;
+}
+
+.segmented-control .segment-active {
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(35, 50, 43, 0.08);
+}
+
+.chart-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.chart-header {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.chart-header strong {
+  color: var(--green);
+  font-size: 1.35rem;
+}
+
+.telemetry-chart {
+  display: block;
+  width: 100%;
+  min-height: 180px;
+}
+
+.chart-axis {
+  stroke: #d8e1d7;
+  stroke-width: 1;
+}
+
+.chart-area {
+  fill: rgba(29, 127, 91, 0.12);
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--green);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.chart-dot {
+  fill: #ffffff;
+  stroke: var(--green);
+  stroke-width: 2;
+}
+
+.chart-range {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric-tile {
+  display: grid;
+  gap: 6px;
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8faf7;
+}
+
+.metric-tile span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.metric-tile strong {
+  font-size: 1rem;
+  line-height: 1.15;
+}
+
+.tag-row {
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.tag-row span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #edf2ec;
+}
+
+.event-list {
+  max-height: 690px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.event-item,
+.ticket-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.event-row {
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.event-item h3,
+.ticket-card h3 {
+  font-size: 0.98rem;
+}
+
+.event-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.87rem;
+  line-height: 1.45;
+}
+
+.event-footer {
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.action-row {
+  gap: 8px;
+}
+
+.secondary-button,
+.primary-button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.secondary-button:hover:not(:disabled),
+.primary-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.secondary-button:disabled,
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.primary-button {
+  width: max-content;
+  color: #ffffff;
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.ticket-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ticket-card dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.ticket-card dl div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.ticket-card dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.ticket-card dd {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.badge-info,
+.badge-online,
+.badge-resolved {
+  color: #166449;
+  border-color: #abd8c5;
+  background: #e7f6ef;
+}
+
+.badge-warning,
+.badge-attention,
+.badge-acknowledged,
+.badge-scheduled,
+.badge-in_progress {
+  color: #8d4f12;
+  border-color: #efc27d;
+  background: #fff3df;
+}
+
+.badge-critical,
+.badge-offline,
+.badge-open {
+  color: #a6312b;
+  border-color: #efaaa5;
+  background: #fff0ef;
+}
+
+@media (max-width: 1320px) {
+  .overview-layout {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+
+  .overview-layout .event-panel {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    padding: 12px;
+  }
+
+  .nav-list {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    justify-content: end;
+    overflow-x: auto;
+  }
+
+  .sidebar-status {
+    display: none;
+  }
+
+  .stat-grid,
+  .overview-layout,
+  .ticket-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .device-detail,
+  .overview-layout .event-panel {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 680px) {
+  .workspace {
+    padding: 18px;
+  }
+
+  .topbar,
+  .device-detail-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topbar-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .stat-grid,
+  .overview-layout,
+  .metric-grid,
+  .ticket-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .asset-list {
+    grid-column: 1 / -1;
+  }
+
+  .segmented-control {
+    width: 100%;
+  }
+
+  .nav-item {
+    padding: 0 10px;
+  }
+}
